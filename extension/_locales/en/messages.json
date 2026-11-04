@@ -376,6 +376,9 @@
     "menuDownloadVTT": {
         "message": "Download as VTT"
     },
+    "menuDownloadTXT": {
+        "message": "Download as TXT"
+    },
     "menuFontSans": {
         "message": "Sans-serif"
     },

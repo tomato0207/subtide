@@ -74,6 +74,28 @@ function exportAsVTT(subtitles) {
     return header + body;
 }
 
+// Pause length that starts a new paragraph in TXT export
+const TXT_PARAGRAPH_GAP_MS = 2000;
+
+/**
+ * Export subtitles as plain text (no timestamps), one line per subtitle,
+ * with a blank line wherever the speaker pauses.
+ * @param {Array} subtitles - Array of subtitle objects with start, end, text
+ * @returns {string} Plain text
+ */
+function exportAsTXT(subtitles) {
+    if (!subtitles || subtitles.length === 0) {
+        console.error('[Subtide] No subtitles to export');
+        return null;
+    }
+
+    return subtitles.map((sub, index) => {
+        const text = sub.translatedText || sub.text;
+        const prev = subtitles[index - 1];
+        return prev && sub.start - prev.end >= TXT_PARAGRAPH_GAP_MS ? `\n${text}` : text;
+    }).join('\n');
+}
+
 /**
  * Trigger file download
  * @param {string} content - File content
@@ -97,12 +119,29 @@ function triggerDownload(content, filename, mimeType) {
 }
 
 /**
+ * Get subtitles for export. YouTube keeps them in per-video state
+ * (getCurrentState in youtube.js); Twitch uses plain globals.
+ * @returns {{translated: Array|null, source: Array|null}}
+ */
+function getExportSubtitles() {
+    if (typeof getCurrentState === 'function') {
+        const state = getCurrentState();
+        return { translated: state.translatedSubtitles, source: state.sourceSubtitles };
+    }
+    return {
+        translated: typeof translatedSubtitles !== 'undefined' ? translatedSubtitles : null,
+        source: typeof sourceSubtitles !== 'undefined' ? sourceSubtitles : null,
+    };
+}
+
+/**
  * Download subtitles in specified format
  * @param {string} format - 'srt' or 'vtt'
  */
 function downloadSubtitles(format = 'srt') {
     // Use translated subtitles if available, otherwise source
-    const subs = translatedSubtitles || sourceSubtitles;
+    const { translated, source } = getExportSubtitles();
+    const subs = translated || source;
 
     if (!subs || subs.length === 0) {
         console.error('[Subtide] No subtitles available for download');
@@ -110,7 +149,8 @@ function downloadSubtitles(format = 'srt') {
         return;
     }
 
-    const videoTitle = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim()
+    const videoTitle = document.querySelector('ytd-watch-metadata h1')?.textContent?.trim()
+        || document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim()
         || document.querySelector('h1.title')?.textContent?.trim()
         || currentVideoId
         || 'subtitles';
@@ -124,6 +164,10 @@ function downloadSubtitles(format = 'srt') {
         content = exportAsVTT(subs);
         filename = `${safeTitle}.vtt`;
         mimeType = 'text/vtt';
+    } else if (format === 'txt') {
+        content = exportAsTXT(subs);
+        filename = `${safeTitle}.txt`;
+        mimeType = 'text/plain;charset=utf-8';
     } else {
         content = exportAsSRT(subs);
         filename = `${safeTitle}.srt`;
@@ -140,7 +184,8 @@ function downloadSubtitles(format = 'srt') {
  * @param {string} format - 'srt' or 'vtt'
  */
 function downloadDualSubtitles(format = 'srt') {
-    if (translatedSubtitles && sourceSubtitles) {
+    const { translated, source: sourceSubtitles } = getExportSubtitles();
+    if (translated && sourceSubtitles) {
         // Download translated version
         downloadSubtitles(format);
 

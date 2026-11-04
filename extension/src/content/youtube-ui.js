@@ -374,6 +374,7 @@ function createSubmenusHTML() {
         download: [
             { val: 'srt', label: chrome.i18n.getMessage('menuDownloadSRT') },
             { val: 'vtt', label: chrome.i18n.getMessage('menuDownloadVTT') },
+            { val: 'txt', label: chrome.i18n.getMessage('menuDownloadTXT') || 'Download as TXT' },
         ],
     };
 

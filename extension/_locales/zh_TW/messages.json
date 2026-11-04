@@ -371,10 +371,13 @@
         "message": "已加入 ✓"
     },
     "menuDownloadSRT": {
-        "message": "Download as SRT"
+        "message": "下載 SRT（含時間）"
     },
     "menuDownloadVTT": {
-        "message": "Download as VTT"
+        "message": "下載 VTT（網頁用）"
+    },
+    "menuDownloadTXT": {
+        "message": "下載 TXT（純文字）"
     },
     "menuFontSans": {
         "message": "Sans-serif"

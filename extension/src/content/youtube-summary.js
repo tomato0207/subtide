@@ -79,10 +79,24 @@ function injectSummaryStyles() {
     document.head.appendChild(style);
 }
 
+/**
+ * Find a visible column to hold the panel. YouTube keeps hidden copies of
+ * layout containers with the same IDs, so querySelector alone may pick an invisible one.
+ */
+function findSummaryContainer() {
+    for (const selector of ['ytd-watch-flexy #secondary-inner', 'ytd-watch-flexy #secondary', '#secondary-inner', '#secondary', 'ytd-watch-flexy #below', '#below']) {
+        const visible = [...document.querySelectorAll(selector)].find(el => el.offsetParent !== null && el.offsetWidth > 0);
+        if (visible) return visible;
+    }
+    return null;
+}
+
 function createSummaryPanel() {
-    const container = document.querySelector('#secondary-inner') || document.querySelector('#secondary')
-        || document.querySelector('#below');
-    if (!container) return null;
+    const container = findSummaryContainer();
+    if (!container) {
+        console.warn('[Subtide] Summary: no visible container found');
+        return null;
+    }
 
     injectSummaryStyles();
     const panel = document.createElement('div');
@@ -209,6 +223,7 @@ function startSummary(videoId, targetLanguage) {
             data = { status: 'error', error: error.message };
         }
         if (summaryState.videoId !== videoId) return;
+        console.log('[Subtide] Summary status:', data?.status, data?.error || '');
 
         // Feature disabled on the backend, or no subtitles: show nothing
         if (!data || data.status === 'disabled' || data.status === 'no_subtitles') {
