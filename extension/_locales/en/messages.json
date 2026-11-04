@@ -563,5 +563,8 @@
                 "content": "$1"
             }
         }
+    },
+    "reconnecting": {
+        "message": "Still processing on the server, reconnecting..."
     }
 }

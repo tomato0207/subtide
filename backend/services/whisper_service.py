@@ -22,6 +22,26 @@ warnings.filterwarnings("ignore", category=UserWarning, module="speechbrain")
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 
+def _register_nvidia_dll_dirs():
+    """On Windows, expose cuBLAS/cuDNN DLLs from pip packages (nvidia-*-cu12) to CTranslate2."""
+    if platform.system() != "Windows":
+        return
+    try:
+        import nvidia
+    except ImportError:
+        return
+    for base in getattr(nvidia, '__path__', []):
+        for lib in ('cublas', 'cudnn', 'cuda_nvrtc'):
+            bin_dir = os.path.join(base, lib, 'bin')
+            if os.path.isdir(bin_dir):
+                os.add_dll_directory(bin_dir)
+                # CTranslate2 loads some DLLs lazily via PATH lookup
+                os.environ['PATH'] = bin_dir + os.pathsep + os.environ.get('PATH', '')
+
+
+_register_nvidia_dll_dirs()
+
+
 # Torch is now lazy-loaded to prevent OpenMP conflicts with MLX
 def _ensure_torch():
     import torch
@@ -97,6 +117,7 @@ from backend.config import (
     WHISPER_LOGPROB_THRESHOLD,
     WHISPER_CONDITION_ON_PREVIOUS,
     WHISPER_BEAM_SIZE,
+    CHINESE_CONVERSION,
 )
 from backend.utils.logging_utils import log_stage
 
@@ -126,8 +147,8 @@ def get_whisper_backend():
         except ImportError:
             pass
 
-    # Prefer faster-whisper on Linux/CUDA if available
-    if platform.system() == "Linux":
+    # Prefer faster-whisper on Linux/Windows (CUDA) if available
+    if platform.system() in ("Linux", "Windows"):
         try:
             import faster_whisper
             _whisper_backend = "faster-whisper"
@@ -796,7 +817,14 @@ def get_whisper_device():
         # Fallback to existing logic or error if strictly removed, 
         # but since we removed detection, this case shouldn't be hit unless manually set.
         # We will map it to cpu/cuda same as openai-whisper for safety or just error.
-        logger.warning("faster-whisper backend is deprecated/removed. Using default device detection.")
+        # Use CTranslate2's own CUDA detection so torch is not required
+        try:
+            import ctranslate2
+            if ctranslate2.get_cuda_device_count() > 0:
+                logger.info("CUDA detected via CTranslate2. Using NVIDIA GPU acceleration.")
+                return "cuda"
+        except ImportError:
+            pass
         try:
             torch = _ensure_torch()
             if torch.cuda.is_available():
@@ -1587,8 +1615,44 @@ def run_whisper_process(audio_file: str, progress_callback=None, initial_prompt:
                 if s.get("speaker") is None:
                     s["speaker"] = "SPEAKER_00"
 
+    if (detected_language or "").startswith("zh"):
+        text = convert_chinese_segments(segments, text)
+
     return {
         "segments": segments,
         "text": text,
         "language": detected_language
     }
+
+
+_opencc_converter = None
+
+
+def convert_chinese_segments(segments: list, text: str) -> str:
+    """Convert Chinese segment text in place with OpenCC (CHINESE_CONVERSION, default s2twp).
+
+    Returns the converted full text.
+    """
+    global _opencc_converter
+    if not CHINESE_CONVERSION:
+        return text
+    if _opencc_converter is None:
+        try:
+            import opencc
+        except ImportError:
+            logger.warning("[OPENCC] opencc not installed, skipping Chinese conversion")
+            return text
+        config = CHINESE_CONVERSION
+        try:
+            _opencc_converter = opencc.OpenCC(config)
+        except Exception:
+            # Some builds expect the '.json' suffix
+            _opencc_converter = opencc.OpenCC(f"{config}.json")
+    convert = _opencc_converter.convert
+    for s in segments:
+        s["text"] = convert(s.get("text", ""))
+        for w in s.get("words") or []:
+            if isinstance(w, dict) and w.get("word"):
+                w["word"] = convert(w["word"])
+    logger.info(f"[OPENCC] Converted {len(segments)} segments ({CHINESE_CONVERSION})")
+    return convert(text or "")

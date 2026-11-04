@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, Response
 import json
 from backend.config import (
-    SERVER_API_KEY, SERVER_MODEL, SERVER_API_URL, LANG_NAMES
+    SERVER_API_KEY, SERVER_MODEL, SERVER_API_URL, LANG_NAMES, TRANSCRIBE_ONLY
 )
 from backend.services.process_service import process_video_logic, stream_video_logic
 from backend.services.translation_service import translate_subtitles_simple
@@ -59,7 +59,7 @@ def translate_subtitles():
     data = request.json or {}
     subtitles = data.get('subtitles', [])
     source_lang = data.get('source_lang', 'auto')
-    target_lang = data.get('target_lang', 'en')
+    target_lang = str(data.get('target_lang', 'en')).replace('_', '-')  # popup uses zh_TW-style codes
     model_id = data.get('model')
     api_key = data.get('api_key')
     api_url = data.get('api_url')
@@ -137,7 +137,7 @@ def process_video():
     video_id = data.get('video_id')
     video_url = data.get('video_url')
     stream_url = data.get('stream_url')
-    target_lang = data.get('target_lang', 'en')
+    target_lang = str(data.get('target_lang', 'en')).replace('_', '-')  # popup uses zh_TW-style codes
     force_whisper = data.get('force_whisper', False)
     force_refresh = data.get('force_refresh', False)  # Bypass translation cache
     use_sse = request.headers.get('Accept') == 'text/event-stream'
@@ -164,8 +164,8 @@ def process_video():
     if not validate_lang_code(target_lang):
         return jsonify({'error': 'Invalid target language'}), 400
 
-    # Tier 3 requires server API key
-    if not SERVER_API_KEY:
+    # Tier 3 requires server API key (unless transcription-only mode)
+    if not SERVER_API_KEY and not TRANSCRIBE_ONLY:
         return jsonify({
             'error': 'Tier 3 is not configured on this server',
             'details': 'SERVER_API_KEY environment variable not set'
@@ -213,7 +213,7 @@ def stream_video():
     video_id = data.get('video_id')
     video_url = data.get('video_url')
     stream_url = data.get('stream_url')
-    target_lang = data.get('target_lang', 'en')
+    target_lang = str(data.get('target_lang', 'en')).replace('_', '-')  # popup uses zh_TW-style codes
     force_whisper = data.get('force_whisper', False)
     force_refresh = data.get('force_refresh', False)  # Bypass translation cache
 

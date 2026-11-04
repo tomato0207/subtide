@@ -12,6 +12,22 @@ logger = logging.getLogger('subtide')
 # Logging prefix for consistent log messages
 LOG_PREFIX = "[VIDEO_LOADER]"
 
+
+def _youtube_client_opts() -> Dict[str, Any]:
+    """yt-dlp options for YouTube clients and JS challenge solving.
+
+    YTDLP_PLAYER_CLIENTS: comma-separated player clients (empty = yt-dlp defaults).
+    YTDLP_JS_RUNTIMES: comma-separated JS runtimes, e.g. 'node' or 'deno' (empty = yt-dlp default).
+    """
+    opts: Dict[str, Any] = {}
+    clients = [c.strip() for c in os.getenv('YTDLP_PLAYER_CLIENTS', '').split(',') if c.strip()]
+    if clients:
+        opts['extractor_args'] = {'youtube': {'player_client': clients}}
+    runtimes = [r.strip() for r in os.getenv('YTDLP_JS_RUNTIMES', '').split(',') if r.strip()]
+    if runtimes:
+        opts['js_runtimes'] = {r: {} for r in runtimes}
+    return opts
+
 # Minimum file size in bytes to consider a cached audio file valid
 # Files smaller than this are likely corrupted/incomplete downloads
 MIN_VALID_AUDIO_SIZE_BYTES = 1000
@@ -126,12 +142,7 @@ def get_video_info(url: str) -> Dict[str, Any]:
         'quiet': True,
         'no_warnings': True,
         'ignore_no_formats_error': True,
-        # Workaround for YouTube SABR streaming enforcement
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'web'],
-            }
-        },
+        **_youtube_client_opts(),
     }
 
     # Add cookie file if available
@@ -206,13 +217,7 @@ def download_audio(url: str, custom_id: Optional[str] = None) -> Optional[str]:
             'socket_timeout': 30,
             'retries': 3,
             'fragment_retries': 3,
-            # Workaround for YouTube SABR streaming enforcement (403 errors)
-            # Try different player clients that may bypass restrictions
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['ios', 'web'],
-                }
-            },
+            **_youtube_client_opts(),
         }
 
         if COOKIES_FILE and os.path.exists(COOKIES_FILE):

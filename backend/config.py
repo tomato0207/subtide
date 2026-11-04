@@ -159,6 +159,13 @@ WHISPER_HF_REPO = os.getenv('WHISPER_HF_REPO')
 # Force source language detection (e.g., 'ja' for Japanese, 'en' for English)
 # Set to None or empty for auto-detection
 WHISPER_LANGUAGE = os.getenv('WHISPER_LANGUAGE', '') or None
+# Convert Chinese transcripts with OpenCC (e.g., 's2twp' = Simplified -> Taiwan Traditional).
+# Set to empty to disable.
+CHINESE_CONVERSION = os.getenv('CHINESE_CONVERSION', 's2twp')
+
+# Transcription-only mode: skip LLM translation entirely (no API key required).
+# Whisper output is returned as-is for /api/process.
+TRANSCRIBE_ONLY = os.getenv('TRANSCRIBE_ONLY', 'false').lower() == 'true'
 
 # Supported Languages
 LANG_NAMES = {

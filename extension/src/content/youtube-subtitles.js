@@ -399,6 +399,47 @@ function updateSubtitleWindow(currentIndex) {
 }
 
 /**
+ * Re-center the subtitle window when playback time falls outside it
+ * (e.g. after seeking or starting mid-video). updateSubtitleWindow() only
+ * moves the window when a subtitle is found inside it, so without this a
+ * position outside the first window would never show subtitles.
+ * @param {number} time - Playback time in ms (sync offset already applied)
+ * @returns {boolean} True if the window moved
+ */
+function recenterSubtitleWindow(time) {
+    if (!subtitleWindow.isEnabled) return false;
+
+    const active = subtitleWindow.activeList;
+    if (active?.length && time >= active[0].start && time <= active[active.length - 1].end) {
+        return false;
+    }
+
+    // Binary search: first subtitle ending at or after `time`
+    const full = subtitleWindow.fullList;
+    let left = 0;
+    let right = full.length - 1;
+    while (left < right) {
+        const mid = Math.floor((left + right) / 2);
+        if (full[mid].end < time) {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+
+    const halfWindow = Math.floor(subtitleWindow.windowSize / 2);
+    const start = Math.max(0, Math.min(left - halfWindow, full.length - subtitleWindow.windowSize));
+    const end = Math.min(full.length, start + subtitleWindow.windowSize);
+    if (start === subtitleWindow.windowStart && end === subtitleWindow.windowEnd) return false;
+
+    subtitleWindow.windowStart = start;
+    subtitleWindow.windowEnd = end;
+    subtitleWindow.activeList = full.slice(start, end);
+    subtitleWindow.lastAccessTime = performance.now();
+    return true;
+}
+
+/**
  * Get active subtitle list (windowed for long videos)
  * Uses getVideoState from youtube.js if available for per-video state
  * @returns {Array} Active subtitle list
@@ -605,6 +646,9 @@ function setupSync() {
         }
 
         // Use windowed access for performance on long videos
+        if (recenterSubtitleWindow(time - syncOffset)) {
+            syncState.currentSubIndex = -1;
+        }
         const activeSubs = getActiveSubtitles();
         const localIndex = subtitleWindow.isEnabled ? toLocalIndex(syncState.currentSubIndex) : syncState.currentSubIndex;
 
@@ -706,10 +750,11 @@ function setupSync() {
         syncState.isStalled = false;
 
         // Immediately display subtitle at new position (don't wait for next frame)
+        const time = video.currentTime * 1000;
+        recenterSubtitleWindow(time - syncOffset);
         const subs = getActiveSubtitles();
         if (!subs?.length) return;
 
-        const time = video.currentTime * 1000;
         const sub = findSubtitleAtTimeWithTolerance(subs, time, -1);
         const textEl = document.querySelector('.vt-text');
 

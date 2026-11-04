@@ -1,5 +1,7 @@
 # Subtide
 
+> 本專案修改自 [rennerdo30/subtide](https://github.com/rennerdo30/subtide)（MIT 授權），調整為在 Windows + NVIDIA 顯示卡上只做中文轉錄（繁體中文字幕、不翻譯）。安裝與使用方式見 [使用說明.md](使用說明.md)。
+
 <p align="center">
   <img src="extension/icons/icon128.png" width="128" height="128" alt="Subtide Logo">
 </p>

@@ -496,8 +496,8 @@ async function translateVideo(targetLang, options = {}) {
             state.isStreaming = false;
 
         } else if (userTier === 'tier3') {
-            // Tier 3: Single combined call
-            result = await sendMessage({
+            // Tier 3: Single combined call (retried if Chrome kills the service worker on long videos)
+            result = await sendProcessWithRetry({
                 action: 'process',
                 videoId: currentVideoId,
                 targetLanguage: targetLang,
@@ -732,6 +732,37 @@ function hideLiveStatus() {
 // =============================================================================
 // Communication
 // =============================================================================
+
+const PROCESS_RETRY_DELAY_MS = 15 * 1000;
+const PROCESS_RETRY_MAX_MS = 60 * 60 * 1000;
+
+/**
+ * Send a Tier 3 'process' message, retrying when the connection to the
+ * service worker drops. Chrome terminates MV3 service workers whose message
+ * handling exceeds ~5 minutes, which happens on long videos; the backend keeps
+ * transcribing, and a retry either joins the in-flight job or hits the cache.
+ * Errors reported by the backend itself are returned without retrying.
+ */
+async function sendProcessWithRetry(msg) {
+    const deadline = Date.now() + PROCESS_RETRY_MAX_MS;
+    // Only the first attempt may bypass the cache; retries must reuse the running job
+    let attemptMsg = msg;
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await sendMessage(attemptMsg);
+        } catch (error) {
+            const contextGone = !chrome.runtime?.id || /context invalidated/i.test(error.message);
+            if (contextGone || Date.now() + PROCESS_RETRY_DELAY_MS > deadline) {
+                throw error;
+            }
+            console.warn(`[Subtide] Connection lost (${error.message}), retrying (${attempt})...`);
+            const reconnecting = chrome.i18n.getMessage('reconnecting') || 'Still processing on the server, reconnecting...';
+            updateStatus(`${reconnecting} (${attempt})`, 'loading', null, { animationKey: 'translating' });
+            await new Promise(resolve => setTimeout(resolve, PROCESS_RETRY_DELAY_MS));
+            attemptMsg = { ...msg, forceRefresh: false };
+        }
+    }
+}
 
 /**
  * Send message to background script

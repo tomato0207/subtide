@@ -7,7 +7,7 @@ import time
 import hashlib
 from typing import Generator, Dict, Any, List, Optional
 
-from backend.config import CACHE_DIR, ENABLE_WHISPER, SERVER_API_KEY
+from backend.config import CACHE_DIR, ENABLE_WHISPER, SERVER_API_KEY, TRANSCRIBE_ONLY
 
 # =============================================================================
 # Request Deduplication (PERF-005)
@@ -191,7 +191,7 @@ def process_video_logic(video_id: str, target_lang: str, force_whisper: bool, us
     """
     logger.info(f"Entry process_video_logic: video_id={video_id}, target={target_lang}, force={force_whisper}, sse={use_sse}, url={video_url}, stream_url={stream_url}, force_refresh={force_refresh}")
 
-    if not SERVER_API_KEY:
+    if not SERVER_API_KEY and not TRANSCRIBE_ONLY:
          # This should be handled by the route, but ensuring here logic-wise
          yield f"data: {json.dumps({'error': 'Tier 3 not configured'})}\n\n"
          return
@@ -365,7 +365,8 @@ def process_video_logic(video_id: str, target_lang: str, force_whisper: bool, us
                     subtitles = await_download_subtitles(video_id, target_lang, manual_subs[target_lang])
 
                 # Priority 2: Manual subtitles in another language
-                elif manual_subs and not force_whisper:
+                # (skipped in transcription-only mode: they could not be translated anyway)
+                elif manual_subs and not force_whisper and not TRANSCRIBE_ONLY:
                     source_lang = 'en' if 'en' in manual_subs else list(manual_subs.keys())[0]
                     send_sse('downloading', f'Downloading {source_lang} subtitles...', 20, step=2, total_steps=4)
                     source_type = 'youtube_manual'
@@ -450,6 +451,10 @@ def process_video_logic(video_id: str, target_lang: str, force_whisper: bool, us
                     return
 
                 logger.info(f"[PROCESS] Got {len(subtitles)} subtitles from {source_type}")
+
+                if TRANSCRIBE_ONLY and needs_translation:
+                    logger.info("[PROCESS] Transcription-only mode: skipping translation")
+                    needs_translation = False
 
                 # Step 2: Translate if needed
                 if needs_translation:

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, Response
 from backend.config import (
-    ENABLE_WHISPER, SERVER_API_KEY, SERVER_MODEL, PLATFORM, WHISPER_BACKEND
+    ENABLE_WHISPER, SERVER_API_KEY, SERVER_MODEL, PLATFORM, WHISPER_BACKEND, TRANSCRIBE_ONLY
 )
 from backend.utils.model_utils import get_model_context_size
 
@@ -28,7 +28,7 @@ def health_check():
         'service': 'subtide-backend',
         'features': {
             'whisper': ENABLE_WHISPER,
-            'tier3': bool(SERVER_API_KEY)
+            'tier3': bool(SERVER_API_KEY) or TRANSCRIBE_ONLY
         },
         'config': {
             'model': SERVER_MODEL,
@@ -67,6 +67,6 @@ def version():
         'whisper_backend': WHISPER_BACKEND if ENABLE_WHISPER else None,
         'features': {
             'whisper': ENABLE_WHISPER,
-            'tier3': bool(SERVER_API_KEY)
+            'tier3': bool(SERVER_API_KEY) or TRANSCRIBE_ONLY
         }
     })
