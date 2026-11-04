@@ -289,6 +289,9 @@ function checkForVideo() {
     }
 
     if (videoId && videoId !== currentVideoId) {
+        if (typeof removeSummaryPanel === 'function') {
+            removeSummaryPanel();
+        }
         currentVideoId = videoId;
         console.log('[Subtide] Video detected:', videoId, '(isEmbed:', url.pathname.startsWith('/embed/'), ')');
         setupPage(videoId);
@@ -563,6 +566,11 @@ async function translateVideo(targetLang, options = {}) {
         if (!state.isStreaming) {
             showOverlay();
             setupSync();
+        }
+
+        // Chapter summary beside the player (no-op if the backend has it disabled)
+        if (userTier === 'tier3' && typeof startSummary === 'function') {
+            startSummary(currentVideoId, targetLang);
         }
 
     } catch (error) {

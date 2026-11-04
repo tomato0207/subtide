@@ -167,6 +167,13 @@ CHINESE_CONVERSION = os.getenv('CHINESE_CONVERSION', 's2twp')
 # Whisper output is returned as-is for /api/process.
 TRANSCRIBE_ONLY = os.getenv('TRANSCRIBE_ONLY', 'false').lower() == 'true'
 
+# Chapter summaries generated from subtitles by a local Ollama model (/api/summary)
+SUMMARY_ENABLED = os.getenv('SUMMARY_ENABLED', 'false').lower() == 'true'
+SUMMARY_MODEL = os.getenv('SUMMARY_MODEL', 'qwen2.5:7b')
+SUMMARY_OLLAMA_URL = os.getenv('SUMMARY_OLLAMA_URL') or os.getenv('OLLAMA_BASE_URL') or 'http://localhost:11434'
+# How long Ollama keeps the model in VRAM after a request (frees memory for Whisper)
+SUMMARY_KEEP_ALIVE = os.getenv('SUMMARY_KEEP_ALIVE', '2m')
+
 # Supported Languages
 LANG_NAMES = {
     'en': 'English', 'ja': 'Japanese', 'ko': 'Korean', 

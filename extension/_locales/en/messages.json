@@ -566,5 +566,14 @@
     },
     "reconnecting": {
         "message": "Still processing on the server, reconnecting..."
+    },
+    "summaryTitle": {
+        "message": "Chapter Summary"
+    },
+    "summaryGenerating": {
+        "message": "Generating chapter summary..."
+    },
+    "summaryError": {
+        "message": "Summary failed: $1"
     }
 }

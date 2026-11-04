@@ -1726,6 +1726,14 @@ async function handleMessage(message, sender) {
         case 'translate':
             return await handleTranslation(message, sender, config);
 
+        case 'getSummary': {
+            // Chapter summary status (backend starts the job on first call; caller polls)
+            const params = new URLSearchParams({ video_id: message.videoId, lang: message.targetLanguage || 'zh-TW' });
+            const headers = config.backendApiKey ? { 'Authorization': `Bearer ${config.backendApiKey}` } : {};
+            const response = await fetch(`${config.backendUrl}/api/summary?${params}`, { headers });
+            return await response.json().catch(() => ({ status: 'error', error: `HTTP ${response.status}` }));
+        }
+
         case 'process':
             if (config.tier !== 'tier3') {
                 throw new Error(chrome.i18n.getMessage('tier3Only'));

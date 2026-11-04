@@ -479,5 +479,14 @@
     },
     "reconnecting": {
         "message": "後端仍在轉錄中，自動重新連線…"
+    },
+    "summaryTitle": {
+        "message": "章節摘要"
+    },
+    "summaryGenerating": {
+        "message": "正在產生章節摘要…"
+    },
+    "summaryError": {
+        "message": "摘要產生失敗：$1"
     }
 }

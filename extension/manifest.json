@@ -41,6 +41,7 @@
         "src/content/youtube-export.js",
         "src/content/youtube-ui.js",
         "src/content/youtube-shorts.js",
+        "src/content/youtube-summary.js",
         "src/content/youtube.js"
       ],
       "css": [

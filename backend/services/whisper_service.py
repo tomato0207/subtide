@@ -1628,27 +1628,41 @@ def run_whisper_process(audio_file: str, progress_callback=None, initial_prompt:
 _opencc_converter = None
 
 
-def convert_chinese_segments(segments: list, text: str) -> str:
-    """Convert Chinese segment text in place with OpenCC (CHINESE_CONVERSION, default s2twp).
-
-    Returns the converted full text.
-    """
+def _get_opencc_converter():
+    """Lazy-load the OpenCC converter for CHINESE_CONVERSION. Returns None if disabled/unavailable."""
     global _opencc_converter
     if not CHINESE_CONVERSION:
-        return text
+        return None
     if _opencc_converter is None:
         try:
             import opencc
         except ImportError:
             logger.warning("[OPENCC] opencc not installed, skipping Chinese conversion")
-            return text
+            return None
         config = CHINESE_CONVERSION
         try:
             _opencc_converter = opencc.OpenCC(config)
         except Exception:
             # Some builds expect the '.json' suffix
             _opencc_converter = opencc.OpenCC(f"{config}.json")
-    convert = _opencc_converter.convert
+    return _opencc_converter
+
+
+def convert_chinese_text(text: str) -> str:
+    """Convert a Chinese string with OpenCC (no-op if conversion is disabled)."""
+    converter = _get_opencc_converter()
+    return converter.convert(text) if converter and text else text
+
+
+def convert_chinese_segments(segments: list, text: str) -> str:
+    """Convert Chinese segment text in place with OpenCC (CHINESE_CONVERSION, default s2twp).
+
+    Returns the converted full text.
+    """
+    converter = _get_opencc_converter()
+    if converter is None:
+        return text
+    convert = converter.convert
     for s in segments:
         s["text"] = convert(s.get("text", ""))
         for w in s.get("words") or []:
