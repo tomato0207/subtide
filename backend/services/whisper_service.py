@@ -93,6 +93,7 @@ def _ensure_torch():
     torch._antigravity_patched = True
     return torch
 
+from backend.services.subtitle_splitter import split_long_segments
 from backend.config import (
     CACHE_DIR,
     MODEL_CACHE_DIR,
@@ -1362,6 +1363,13 @@ def run_whisper_process(audio_file: str, progress_callback=None, initial_prompt:
 
     # Timestamp refinement - tighten boundaries using word timestamps
     segments = refine_timestamps(segments)
+
+    # Long segments (Whisper often returns 10-30 s, unpunctuated in Chinese) fill the screen:
+    # split them into lines of readable length
+    pre_split_count = len(segments)
+    segments = split_long_segments(segments)
+    if len(segments) != pre_split_count:
+        logger.info(f"[WHISPER] Split long segments: {pre_split_count} -> {len(segments)}")
 
     # Diarization
     pipeline = get_diarization_pipeline()

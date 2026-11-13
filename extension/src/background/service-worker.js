@@ -306,7 +306,8 @@ async function isConfigured() {
 
 const CACHE_KEY = 'translationCache';
 const MAX_CACHE_ENTRIES = 100;
-const CACHE_VERSION = 1;
+// 2: subtitles re-split into readable lines; older cached copies are discarded
+const CACHE_VERSION = 2;
 
 function generateCacheKey(videoId, sourceLanguage, targetLanguage) {
     // Use JSON encoding to avoid collision with underscore-containing IDs
@@ -317,7 +318,8 @@ function generateCacheKey(videoId, sourceLanguage, targetLanguage) {
 async function getAllCache() {
     return new Promise((resolve) => {
         chrome.storage.local.get([CACHE_KEY], (result) => {
-            resolve(result[CACHE_KEY] || { version: CACHE_VERSION, entries: {} });
+            const cache = result[CACHE_KEY];
+            resolve(cache && cache.version === CACHE_VERSION ? cache : { version: CACHE_VERSION, entries: {} });
         });
     });
 }
@@ -1702,6 +1704,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
 });
 
+/**
+ * POST JSON to the backend. Errors (including the backend not running) come back as
+ * { error } instead of throwing, so they are shown in the page, not logged as extension errors.
+ */
+async function postBackendJSON(config, path, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.backendApiKey) headers['Authorization'] = `Bearer ${config.backendApiKey}`;
+    let response;
+    try {
+        response = await fetch(`${config.backendUrl}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    } catch (e) {
+        return { error: e.message };
+    }
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? data : { error: data.error || `HTTP ${response.status}` };
+}
+
 async function handleMessage(message, sender) {
     const config = await getConfig();
 
@@ -1732,6 +1751,49 @@ async function handleMessage(message, sender) {
             const headers = config.backendApiKey ? { 'Authorization': `Bearer ${config.backendApiKey}` } : {};
             const response = await fetch(`${config.backendUrl}/api/summary?${params}`, { headers });
             return await response.json().catch(() => ({ status: 'error', error: `HTTP ${response.status}` }));
+        }
+
+        case 'defineWord':
+            // Hover dictionary: content scripts can't reach http://localhost from https pages
+            return await postBackendJSON(config, '/api/define', {
+                word: message.word,
+                context: message.context || '',
+                mode: message.mode || 'dict',
+                lemma: message.lemma || '',
+                near: message.near || '',
+            });
+
+        case 'ocrWord':
+            // Hover dictionary on video frames: find the English word under the cursor
+            return await postBackendJSON(config, '/api/ocr-word', { image: message.image, x: message.x, y: message.y });
+
+        case 'ttsRequest': {
+            // Backend TTS proxy: Chrome blocks https pages from fetching http://localhost directly
+            if (!/^\/api\/tts\/(status|voices|speak)\b/.test(message.path || '')) {
+                return { ok: false, error: 'Invalid TTS path' };
+            }
+            const init = { method: message.method || 'GET', headers: {} };
+            if (config.backendApiKey) init.headers['Authorization'] = `Bearer ${config.backendApiKey}`;
+            if (message.body) {
+                init.headers['Content-Type'] = 'application/json';
+                init.body = JSON.stringify(message.body);
+            }
+            try {
+                const response = await fetch(`${config.backendUrl}${message.path}`, init);
+                if (message.binary && response.ok) {
+                    const bytes = new Uint8Array(await response.arrayBuffer());
+                    let binary = '';
+                    for (let i = 0; i < bytes.length; i += 0x8000) {
+                        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                    }
+                    return { ok: true, audio: btoa(binary), contentType: response.headers.get('Content-Type') || 'audio/mpeg' };
+                }
+                const data = await response.json().catch(() => ({}));
+                return { ok: response.ok, status: response.status, data };
+            } catch (e) {
+                // Backend not running: expected, so don't log it as an extension error
+                return { ok: false, error: e.message };
+            }
         }
 
         case 'process':
@@ -2352,5 +2414,44 @@ async function processQueue() {
 
 // Add queue actions to message handler - need to update the switch statement
 // This will be handled by adding cases in handleMessage
+
+// ============================================================================
+// Hover dictionary on/off: Alt+W shortcut, "OFF" badge on the toolbar icon
+// ============================================================================
+
+const WORD_LOOKUP_KEY = 'wordLookupEnabled';
+
+function showWordLookupBadge(enabled) {
+    chrome.action.setBadgeText({ text: enabled ? '' : 'OFF' });
+    chrome.action.setBadgeBackgroundColor({ color: '#6e7681' });
+}
+
+chrome.commands.onCommand.addListener(async (command) => {
+    if (command !== 'toggle-word-lookup') return;
+    const stored = await chrome.storage.local.get(WORD_LOOKUP_KEY);
+    await chrome.storage.local.set({ [WORD_LOOKUP_KEY]: stored[WORD_LOOKUP_KEY] === false });
+});
+
+// Covers the shortcut and the popup checkbox alike
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[WORD_LOOKUP_KEY]) {
+        showWordLookupBadge(changes[WORD_LOOKUP_KEY].newValue !== false);
+    }
+});
+
+chrome.storage.local.get(WORD_LOOKUP_KEY).then((r) => showWordLookupBadge(r[WORD_LOOKUP_KEY] !== false));
+
+// Chrome doesn't add content scripts to tabs that were already open when the extension is
+// installed, updated or reloaded, so the hover dictionary would be dead there until a refresh.
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+    if (reason !== 'install' && reason !== 'update') return;
+    const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+    for (const tab of tabs) {
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id, allFrames: true },
+            files: ['src/content/word-lookup.js'],
+        }).catch(() => { /* discarded tab or restricted page */ });
+    }
+});
 
 vtLog.info('Service worker initialized');

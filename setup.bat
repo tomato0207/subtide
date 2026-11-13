@@ -71,6 +71,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [5/6] 安裝英漢字典（滑鼠查單字用，約 66MB）...
+"venv\Scripts\python.exe" scripts\install_dictionary.py
+if errorlevel 1 echo [5/6] 警告：字典下載失敗，滑鼠查單字將無法使用，可稍後重新執行 setup.bat。
+
 rem ---------- 6. Ollama + 摘要模型（章節摘要用，可略過） ----------
 set "OLLAMA=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
 if not exist "%OLLAMA%" (

@@ -447,6 +447,12 @@ async function prefetchSubtitles(videoId) {
 async function translateVideo(targetLang, options = {}) {
     const { forceRefresh = false } = options;
 
+    // Extension was reloaded/updated after this page loaded: every chrome.* call would throw
+    if (!chrome.runtime?.id) {
+        try { updateStatus('擴充已更新，請重新整理這個頁面（F5）', 'error'); } catch (_) { /* UI unavailable */ }
+        return;
+    }
+
     // Store target language for TTS
     window._vtCurrentTargetLang = targetLang;
 

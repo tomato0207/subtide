@@ -34,27 +34,39 @@ function injectSummaryStyles() {
     const style = document.createElement('style');
     style.id = 'vt-summary-styles';
     style.textContent = `
+        /* Fixed palette (YouTube's theme variables gave low-contrast text); dark when YouTube is dark */
         #${SUMMARY_PANEL_ID} {
+            --vt-sum-bg: #ffffff; --vt-sum-card: #f2f2f2; --vt-sum-hover: #e8e8e8;
+            --vt-sum-text: #0f0f0f; --vt-sum-sub: #3f3f3f; --vt-sum-border: #d9d9d9; --vt-sum-accent: #065fd4;
+        }
+        html[dark] #${SUMMARY_PANEL_ID} {
+            --vt-sum-bg: #212121; --vt-sum-card: #303030; --vt-sum-hover: #383838;
+            --vt-sum-text: #f1f1f1; --vt-sum-sub: #d0d0d0; --vt-sum-border: #3f3f3f; --vt-sum-accent: #3ea6ff;
+        }
+        #${SUMMARY_PANEL_ID} {
+            position: relative; z-index: 10; isolation: isolate; opacity: 1;
             margin: 0 0 16px;
-            border: 1px solid var(--yt-spec-10-percent-layer, rgba(128,128,128,.25));
+            background: var(--vt-sum-bg);
+            border: 1px solid var(--vt-sum-border);
             border-radius: 12px;
-            color: var(--yt-spec-text-primary, #0f0f0f);
-            font-family: Roboto, Arial, sans-serif;
+            color: var(--vt-sum-text);
+            font-family: Roboto, Arial, "Microsoft JhengHei", sans-serif;
             overflow: hidden;
         }
+        #${SUMMARY_PANEL_ID} * { opacity: 1; mask-image: none; -webkit-mask-image: none; }
         #${SUMMARY_PANEL_ID} .vt-sum-header {
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 16px; cursor: pointer; user-select: none;
-            font-size: 16px; font-weight: 600;
+            font-size: 16px; font-weight: 600; color: var(--vt-sum-text);
         }
-        #${SUMMARY_PANEL_ID} .vt-sum-toggle { font-size: 12px; color: var(--yt-spec-text-secondary, #606060); }
+        #${SUMMARY_PANEL_ID} .vt-sum-toggle { font-size: 12px; color: var(--vt-sum-sub); }
         #${SUMMARY_PANEL_ID}.vt-collapsed .vt-sum-body { display: none; }
         #${SUMMARY_PANEL_ID} .vt-sum-status {
-            padding: 0 16px 12px; font-size: 13px; color: var(--yt-spec-text-secondary, #606060);
+            padding: 0 16px 12px; font-size: 13px; color: var(--vt-sum-sub);
         }
         #${SUMMARY_PANEL_ID} .vt-sum-overview {
             margin: 0 16px 8px; padding: 10px 12px; border-radius: 8px;
-            background: var(--yt-spec-badge-chip-background, rgba(128,128,128,.12));
+            background: var(--vt-sum-card); color: var(--vt-sum-text);
             font-size: 13px; line-height: 1.6;
         }
         #${SUMMARY_PANEL_ID} .vt-sum-list { max-height: 60vh; overflow-y: auto; padding: 4px 8px 8px; }
@@ -62,18 +74,18 @@ function injectSummaryStyles() {
             display: grid; grid-template-columns: auto 1fr; column-gap: 10px;
             padding: 8px; border-radius: 8px; cursor: pointer;
         }
-        #${SUMMARY_PANEL_ID} .vt-sum-item:hover { background: var(--yt-spec-badge-chip-background, rgba(128,128,128,.12)); }
+        #${SUMMARY_PANEL_ID} .vt-sum-item:hover { background: var(--vt-sum-hover); }
         #${SUMMARY_PANEL_ID} .vt-sum-item.vt-active {
-            background: var(--yt-spec-badge-chip-background, rgba(128,128,128,.12));
-            box-shadow: inset 3px 0 0 #3ea6ff;
+            background: var(--vt-sum-card);
+            box-shadow: inset 3px 0 0 var(--vt-sum-accent);
         }
         #${SUMMARY_PANEL_ID} .vt-sum-time {
             grid-row: span 2; font-size: 12px; font-variant-numeric: tabular-nums;
-            color: #3ea6ff; padding-top: 2px;
+            color: var(--vt-sum-accent); padding-top: 2px;
         }
-        #${SUMMARY_PANEL_ID} .vt-sum-title { font-size: 14px; font-weight: 500; line-height: 1.4; }
+        #${SUMMARY_PANEL_ID} .vt-sum-title { font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--vt-sum-text); }
         #${SUMMARY_PANEL_ID} .vt-sum-text {
-            font-size: 13px; line-height: 1.5; color: var(--yt-spec-text-secondary, #606060);
+            font-size: 13px; line-height: 1.5; color: var(--vt-sum-sub);
         }
     `;
     document.head.appendChild(style);

@@ -174,6 +174,9 @@ SUMMARY_OLLAMA_URL = os.getenv('SUMMARY_OLLAMA_URL') or os.getenv('OLLAMA_BASE_U
 # How long Ollama keeps the model in VRAM after a request (frees memory for Whisper)
 SUMMARY_KEEP_ALIVE = os.getenv('SUMMARY_KEEP_ALIVE', '2m')
 
+# Hover dictionary for English words (/api/define); uses SUMMARY_MODEL
+WORD_LOOKUP_ENABLED = os.getenv('WORD_LOOKUP_ENABLED', 'false').lower() == 'true'
+
 # Supported Languages
 LANG_NAMES = {
     'en': 'English', 'ja': 'Japanese', 'ko': 'Korean', 
@@ -194,6 +197,10 @@ VAD_THRESHOLD = float(os.getenv('VAD_THRESHOLD', '0.5'))  # Speech probability t
 # Subtitle Segment Limits
 MAX_SUBTITLE_DURATION = float(os.getenv('MAX_SUBTITLE_DURATION', '6.0'))  # seconds
 MAX_SUBTITLE_WORDS = int(os.getenv('MAX_SUBTITLE_WORDS', '15'))
+# Longest subtitle line in display units (CJK char = 1, other chars = 0.5); longer Whisper segments are split
+MAX_SUBTITLE_CHARS = float(os.getenv('MAX_SUBTITLE_CHARS', '32'))
+# Longest time one subtitle line stays on screen when splitting long Whisper segments
+MAX_LINE_DURATION = float(os.getenv('MAX_LINE_DURATION', '8.0'))
 
 # Speaker Diarization Tuning
 MIN_SPEAKERS = int(os.getenv('MIN_SPEAKERS', '0')) or None  # 0 = auto-detect

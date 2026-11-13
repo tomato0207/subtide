@@ -1,5 +1,6 @@
 backend/venv
 backend/cache
+backend/data
 __pycache__
 backend/.env
 *.log

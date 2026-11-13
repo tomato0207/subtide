@@ -329,6 +329,28 @@ Same functionality as `/api/process` but streams translated subtitle batches imm
 
 ---
 
+#### `POST /api/define`
+Hover dictionary for an English word. Requires `WORD_LOOKUP_ENABLED=true` (404 otherwise).
+
+**Body:** `{"word": "running", "context": "sentence it appears in", "mode": "dict" | "extras" | "ai", "lemma": "...", "near": "..."}`
+
+| Mode | Source | Response |
+|------|--------|----------|
+| `dict` (default) | Local ECDICT SQLite (`backend/data/ecdict.db`, MIT), instant, offline | `{word, lemma, form_of, phonetic, senses[], lemma_senses[], definitions[], forms[], tags[]}`; 404 if unknown |
+| `extras` | Free Dictionary API (examples, English definitions) + Google Translate (zh-TW) | `{definitions[], examples[{en, zh}], context_zh}`; parts empty on network failure |
+| `ai` | Local Ollama (`SUMMARY_MODEL`), on demand only | `{word, in_context, note, sentence_zh}` |
+
+Inflected forms resolve to the lemma via ECDICT's exchange data (`went` → `go 的過去式`). Errors: 400 invalid word/mode, 503 dictionary missing or Ollama unreachable, 502 lookup failed.
+
+#### `POST /api/ocr-word`
+Finds the English word under the cursor in a video frame strip (text burned into the video, e.g. slides).
+
+**Body:** `{"image": "<base64 JPEG/PNG or data: URL>", "x": 120, "y": 40}` (pixels in the image) → `{"found": true, "word", "context", "near"}` or `{"found": false}`.
+
+RapidOCR detects text lines, then recognizes only the line under the cursor (~0.3–1 s on CPU). The word is located by character proportion in the line. OCR often drops spaces between English words, so the backend tries the whole letter run, then the run with `l`→`i` fixed, then the piece split out by `wordninja`.
+
+**Extension side:** `src/content/word-lookup.js` runs on all pages. Resting the mouse ~0.6 s on an English word shows the box: `dict` first, then `extras`, and an "AI 解析" button for `ai`. Subtitle layers (`.vt-text`, `.vt-subtitle-text`, `.ytp-caption-segment`) are hit-tested manually because they use `pointer-events: none`. When no DOM word is under the cursor and it rests on a `<video>`, a full-width strip of the frame (~12% of its height) is sent to `/api/ocr-word`. All backend calls go through the service worker (`defineWord`, `ocrWord`), because https pages cannot fetch `http://localhost`; backend TTS calls use the same proxy (`ttsRequest`). Toggle: storage key `wordLookupEnabled`, set by the popup checkbox or the `toggle-word-lookup` command (Alt+W); the toolbar icon shows an "OFF" badge while disabled. Dictionary install: `backend/scripts/install_dictionary.py` (run by `setup.bat`).
+
 ### Deprecated Endpoints
 
 #### `POST /api/translate`
@@ -355,6 +377,9 @@ While the extension typically translates client-side for Tier 1 & 2 to keep API 
 | `SERVER_API_KEY` | API key for Tier 3 managed translation | - |
 | `SERVER_MODEL` | Default model for Tier 3 | `gpt-3.5-turbo` |
 | `SERVER_API_URL` | Custom API URL for Tier 3 | - |
+| `WORD_LOOKUP_ENABLED` | Enable `/api/define` hover dictionary | `false` |
+| `MAX_SUBTITLE_CHARS` | Longest subtitle line (CJK char = 1, other = 0.5); longer Whisper segments are split at punctuation, pauses or connectives using word timestamps (`services/subtitle_splitter.py`) | `32` |
+| `MAX_LINE_DURATION` | Longest time one split subtitle line stays on screen (seconds) | `8.0` |
 
 ### Extension Storage
 
@@ -367,6 +392,7 @@ While the extension typically translates client-side for Tier 1 & 2 to keep API 
 | `tier` | Service tier |
 | `forceGen` | Force Whisper generation |
 | `defaultLanguage` | Default target language |
+| `wordLookupEnabled` | Hover dictionary on/off (default on) |
 
 ## Supported Languages
 

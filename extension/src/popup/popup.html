@@ -286,6 +286,17 @@
         </div>
       </section>
 
+      <!-- Hover dictionary -->
+      <section class="section">
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="wordLookupEnabled" aria-describedby="wordLookupHint" checked>
+            <span>滑鼠查英文單字</span>
+          </label>
+          <span class="hint" id="wordLookupHint">滑鼠停在任何網頁的英文單字上約 0.6 秒，就會顯示中文解析。快速鍵 Alt+W 也能開關</span>
+        </div>
+      </section>
+
       <!-- Text-to-Speech -->
       <section class="section">
         <h2 class="section-title">
@@ -416,6 +427,7 @@
   </div>
 
   <script src="popup.js" type="module"></script>
+  <script src="word-lookup-toggle.js"></script>
 </body>
 
 </html>

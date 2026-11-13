@@ -67,22 +67,22 @@ async function checkBackendAvailability() {
     }
 
     try {
-        const response = await fetch(`${apiUrl}/api/tts/status`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            backendAvailable = data.enabled === true;
-            console.log('[TTS] Backend status:', data);
-        } else {
-            backendAvailable = false;
-        }
+        const response = await backendTTS('/api/tts/status');
+        backendAvailable = !!(response && response.ok && response.data.enabled === true);
+        console.log('[TTS] Backend status:', response && (response.data || response.error));
     } catch (e) {
-        console.warn('[TTS] Backend check failed:', e.message);
+        // Extension reloaded or service worker unavailable; browser TTS still works
+        console.log('[TTS] Backend check failed:', e.message);
         backendAvailable = false;
     }
+}
+
+/**
+ * Call the backend TTS API through the service worker
+ * (https pages may not fetch http://localhost directly).
+ */
+function backendTTS(path, options = {}) {
+    return chrome.runtime.sendMessage({ action: 'ttsRequest', path, ...options });
 }
 
 /**
@@ -205,11 +205,10 @@ async function getAvailableVoices(lang = null) {
     // Get backend voices if available
     if (backendAvailable && apiUrl) {
         try {
-            const url = lang ? `${apiUrl}/api/tts/voices?lang=${lang}` : `${apiUrl}/api/tts/voices`;
-            const response = await fetch(url);
-            if (response.ok) {
-                const data = await response.json();
-                for (const voice of data.voices || []) {
+            const path = lang ? `/api/tts/voices?lang=${encodeURIComponent(lang)}` : '/api/tts/voices';
+            const response = await backendTTS(path);
+            if (response && response.ok) {
+                for (const voice of response.data.voices || []) {
                     voices.push({
                         ...voice,
                         source: 'backend'
@@ -285,25 +284,18 @@ async function speakWithBackend(text, lang) {
 
     const voiceId = ttsVoices[lang] || null;
 
-    const response = await fetch(`${apiUrl}/api/tts/speak`, {
+    const response = await backendTTS('/api/tts/speak', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'audio/mpeg'
-        },
-        body: JSON.stringify({
-            text,
-            lang,
-            voice_id: voiceId
-        })
+        binary: true,
+        body: { text, lang, voice_id: voiceId }
     });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(error.error || 'TTS request failed');
+    if (!response || !response.ok) {
+        throw new Error((response && (response.error || response.data?.error)) || 'TTS request failed');
     }
 
-    const audioBlob = await response.blob();
+    const bytes = Uint8Array.from(atob(response.audio), c => c.charCodeAt(0));
+    const audioBlob = new Blob([bytes], { type: response.contentType });
     const audioUrl = URL.createObjectURL(audioBlob);
 
     return new Promise((resolve, reject) => {
